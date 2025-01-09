@@ -3,7 +3,7 @@
 **/*.egg-info
 **/.autoenv*.zsh
 .vscode
-.cache/**
+.cache/bc-trim/**
 generated-data/**
 bc_trim_stitch/bc_trim_stitch/control-data/.merged/**
 

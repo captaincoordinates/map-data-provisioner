@@ -3,13 +3,14 @@ from os import environ
 from sys import stdout
 from typing import Final
 
-from osgeo import gdal, ogr
+from osgeo import gdal, ogr, osr
 
 _default_log_level: Final[int] = INFO
 _default_log_level_name: Final[str] = getLevelName(_default_log_level)
 
 
 ogr.UseExceptions()
+osr.UseExceptions()
 gdal.UseExceptions()
 
 

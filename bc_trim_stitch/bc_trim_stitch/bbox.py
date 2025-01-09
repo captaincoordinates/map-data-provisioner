@@ -6,8 +6,24 @@ default_crs_code: Final[str] = "EPSG:4326"
 
 @dataclass
 class BBOX:
-    min_x: float
-    min_y: float
-    max_x: float
-    max_y: float
+    x_min: float
+    y_min: float
+    x_max: float
+    y_max: float
     crs_code: str = default_crs_code
+
+    def as_wkt(self) -> str:
+        return "POLYGON (({x_min} {y_min},{x_max} {y_min},{x_max} {y_max},{x_min} {y_max},{x_min} {y_min}))".format(
+            x_min=self.x_min,
+            y_min=self.y_min,
+            x_max=self.x_max,
+            y_max=self.y_max,
+        )
+
+    def to_path_part(self) -> str:
+        return "{x_min}-{y_min}-{x_max}-{y_max}".format(
+            x_min=self.x_min,
+            y_min=self.y_min,
+            x_max=self.x_max,
+            y_max=self.y_max,
+        )

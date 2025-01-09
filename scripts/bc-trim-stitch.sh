@@ -29,7 +29,7 @@ docker build \
 docker run \
     --rm \
     -v $PWD/generated-data:/generated-data:rw \
-    -v $PWD/.cache:/cache:rw \
+    -v $PWD/.cache/bc-trim:/cache:rw \
     -v $PWD/bc_trim_stitch:/app:ro \
     -e TRIM_CACHE_DIR=/cache \
     -e TRIM_GENERATED_DIR=/generated-data \
