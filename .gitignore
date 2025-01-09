@@ -1,0 +1,10 @@
+**/.DS_Store
+**/__pycache__
+**/*.egg-info
+**/.autoenv*.zsh
+.vscode
+.cache/**
+generated-data/**
+bc_trim_stitch/bc_trim_stitch/control-data/.merged/**
+
+!**/.gitkeep
