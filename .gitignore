@@ -5,6 +5,6 @@
 .vscode
 .cache/bc-trim/**
 generated-data/**
-bc_trim_stitch/bc_trim_stitch/control-data/.merged/**
+mdp_bc_trim/mdp_bc_trim/control-data/.merged/**
 
 !**/.gitkeep

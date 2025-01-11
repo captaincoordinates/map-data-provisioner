@@ -20,7 +20,15 @@ set -e
 
 pushd $(dirname $0)/..
 
-pip-compile -q --no-annotate --no-strip-extras --output-file bc_trim_stitch/requirements-generated.txt bc_trim_stitch/setup.py &
+pip-compile -q --no-annotate --no-strip-extras --output-file mdp_common/requirements-generated.txt mdp_common/setup.py &
 pid1=$!
 
+pip-compile -q --no-annotate --no-strip-extras --output-file mdp_bc_hillshade/requirements-generated.txt mdp_bc_hillshade/setup.py &
+pid2=$!
+
+pip-compile -q --no-annotate --no-strip-extras --output-file mdp_bc_trim/requirements-generated.txt mdp_bc_trim/setup.py &
+pid3=$!
+
 wait $pid1
+wait $pid2
+wait $pid3

@@ -4,6 +4,8 @@ set -e
 
 pushd $(dirname $0)/..
 
-pip install -e bc_trim_stitch[dev]
+pip install -e mdp_common
+pip install -e mdp_bc_hillshade
+pip install -e mdp_bc_trim[dev]
 
 pre-commit install

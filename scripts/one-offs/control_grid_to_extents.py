@@ -11,8 +11,8 @@ grid_dir: Final[str] = environ.get(
         path.dirname(__file__),
         "..",
         "..",
-        "bc_trim_stitch",
-        "bc_trim_stitch",
+        "mdp_bc_trim",
+        "mdp_bc_trim",
         "control-data",
     ),
 )

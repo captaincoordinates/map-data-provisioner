@@ -14,14 +14,14 @@ min_y=$2
 max_x=$3
 max_y=$4
 
-grid_parent_dir="bc_trim_stitch/bc_trim_stitch/control-data"
+grid_parent_dir="mdp_bc_trim/mdp_bc_trim/control-data"
 grid_merged_path="$grid_parent_dir/.merged/grid-extents.fgb"
 if [ ! -e "$grid_merged_path" ]; then
     echo "merging control grid parts on first run"
     cat $grid_parent_dir/grid-extents.fgb-part-* > "$grid_merged_path"
 fi
 
-image_name="captaincoordinates/bc-trim-stitch"
+image_name="captaincoordinates/bc-trim"
 docker build \
     -t $image_name \
     .
@@ -30,9 +30,11 @@ docker run \
     --rm \
     -v $PWD/generated-data:/generated-data:rw \
     -v $PWD/.cache/bc-trim:/cache:rw \
-    -v $PWD/bc_trim_stitch:/app:ro \
+    -v $PWD/mdp_common:/mdp_common:ro \
+    -v $PWD/mdp_bc_hillshade:/mdp_bc_hillshade:ro \
+    -v $PWD/mdp_bc_trim:/mdp_bc_trim:ro \
     -e TRIM_CACHE_DIR=/cache \
     -e TRIM_GENERATED_DIR=/generated-data \
-    -w /app \
+    -w /mdp_bc_trim \
     $image_name \
-    python -m bc_trim_stitch.run $min_x $min_y $max_x $max_y
+    python -m mdp_bc_trim.run $min_x $min_y $max_x $max_y

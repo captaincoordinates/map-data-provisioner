@@ -7,7 +7,7 @@ from zipfile import ZipFile
 from osgeo import gdal, ogr
 from requests import get
 
-from bc_trim_stitch.bbox import BBOX
+from mdp_common.bbox import BBOX
 
 _logger: Final[Logger] = getLogger(__file__)
 
