@@ -15,5 +15,8 @@ setup(
             "pre-commit~=4.0.1",
         ],
         "test": [],
+        "local_dependencies": [
+            "bc-hillshade==0.10.0",
+        ],
     },
 )

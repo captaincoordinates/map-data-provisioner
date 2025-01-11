@@ -5,5 +5,7 @@ RUN apt-get update --fix-missing \
   python3-pip=24.0+dfsg-1ubuntu1.1 \
   && rm -rf /var/lib/apt/lists/*
 
+COPY bc_hillshade/requirements-generated.txt /requirements-bc_hillshade.txt
+RUN pip install --no-cache-dir --break-system-packages -r /requirements-bc_hillshade.txt
 COPY bc_trim_stitch/requirements-generated.txt /requirements.txt
 RUN pip install --no-cache-dir --break-system-packages -r /requirements.txt

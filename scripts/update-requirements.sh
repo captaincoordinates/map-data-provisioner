@@ -23,4 +23,8 @@ pushd $(dirname $0)/..
 pip-compile -q --no-annotate --no-strip-extras --output-file bc_trim_stitch/requirements-generated.txt bc_trim_stitch/setup.py &
 pid1=$!
 
+pip-compile -q --no-annotate --no-strip-extras --output-file bc_hillshade/requirements-generated.txt bc_hillshade/setup.py &
+pid2=$!
+
 wait $pid1
+wait $pid2
