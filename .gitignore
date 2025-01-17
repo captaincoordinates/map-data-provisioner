@@ -5,7 +5,7 @@
 .vscode
 .cache/bc-trim/**
 generated-data/**
-mdp_bc_trim/mdp_bc_trim/control-data/.merged/**
+**/control-data/.merged/**
 **/control-data/grid-extents-generated.fgb
 **/control-data/grids.gpkg
 
