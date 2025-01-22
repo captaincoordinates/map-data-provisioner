@@ -7,6 +7,7 @@ from zipfile import ZipFile
 from osgeo import gdal, ogr
 from requests import get
 
+from mdp_bc_hillshade.hillshade import paths_for_bbox
 from mdp_common.bbox import BBOX
 
 _logger: Final[Logger] = getLogger(__file__)
@@ -23,8 +24,12 @@ _generated_dir: Final[str] = environ.get(
 )
 
 
-def execute(bbox: BBOX, ignore_cache: Optional[bool] = False) -> str:
-    final_tif_path_no_suffix = "bc-trim-{}".format(bbox.to_path_part())
+def execute(
+    bbox: BBOX, include_hillshade: bool = False, ignore_cache: Optional[bool] = False
+) -> str:
+    final_tif_path_no_suffix = "bc-trim-{}{}".format(
+        bbox.to_path_part(), "-hillshade" if include_hillshade else ""
+    )
     final_tif_path = path.join(
         _generated_dir, "{}.tif".format(final_tif_path_no_suffix)
     )
@@ -85,6 +90,9 @@ def execute(bbox: BBOX, ignore_cache: Optional[bool] = False) -> str:
             _logger.exception("failed during GDAL warp")
             raise
 
+    if include_hillshade:
+        _ = paths_for_bbox(bbox, ignore_cache=ignore_cache)
+
     vrt_path = path.join(_cache_dir, "{}.vrt".format(final_tif_path_no_suffix))
     if not path.exists(vrt_path) or ignore_cache:
         gdal.BuildVRT(vrt_path, generated_tif_paths)
@@ -113,6 +121,9 @@ if __name__ == "__main__":
     parser.add_argument("min_y", type=float, help="Bounding box minimum y (latitude)")
     parser.add_argument("max_x", type=float, help="Bounding box maximum x (longitude)")
     parser.add_argument("max_y", type=float, help="Bounding box maximum y (latitude)")
+    parser.add_argument(
+        "--hillshade", action="store_true", help="Include hillshading effect"
+    )
     args = parser.parse_args()
     execute(
         BBOX(
@@ -120,5 +131,6 @@ if __name__ == "__main__":
             y_min=args.min_y,
             x_max=args.max_x,
             y_max=args.max_y,
-        )
+        ),
+        include_hillshade=args.hillshade,
     )

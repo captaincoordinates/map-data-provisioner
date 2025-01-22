@@ -1,131 +1,89 @@
-import re
-import zipfile
-from os import environ, path
-from typing import Final, List
+from logging import Logger, getLogger
+from os import environ, makedirs, path
+from re import IGNORECASE, search, sub
+from typing import Final, List, Optional, cast
+from zipfile import ZipFile
 
-from app.common.get_datasource_from_bbox import (
-    BBOX_LAYER_NAME,
-    get_datasource_from_bbox,
-)
-from app.common.http_retriever import RetrievalRequest, retrieve
-from app.common.util import (
-    get_cache_path,
-    get_data_path,
-    get_run_data_path,
-    remove_intermediaries,
-    skip_file_creation,
-    swallow_unimportant_warp_error,
-)
-from app.tilemill.ProjectLayerType import ProjectLayerType
-from osgeo.gdal import DEMProcessing, Warp
-from osgeo.ogr import GetDriverByName
+from osgeo import gdal, ogr
+from requests import get
 
-from mdp_common import nts_50000_grid_path
+from mdp_common import nts_50000_grid_layer_name, nts_50000_grid_path
 from mdp_common.bbox import BBOX
 
+_logger: Final[Logger] = getLogger(__file__)
+
 _cache_dir: Final[str] = environ.get(
-    "TRIM_CACHE_DIR", path.join(path.dirname(__file__), ".cache", "bc-hillshade")
+    "HILLSHADE_CACHE_DIR", path.join(path.dirname(__file__), ".cache", "bc-hillshade")
 )
-_control_grid_layer_name: Final[str] = "nts-50000-grid"
 _generated_dir: Final[str] = environ.get(
-    "BC_HILLSHADE_GENERATED_DIR", path.join(path.dirname(__file__), "generated-data")
+    "HILLSHADE_GENERATED_DIR", path.join(path.dirname(__file__), "generated-data")
 )
 
 
-def provision(bbox: BBOX, run_id: str) -> List[str]:
-    run_directory = get_run_data_path(run_id, (CACHE_DIR_NAME,))
-    os.makedirs(run_directory)
-    driver = GetDriverByName("GPKG")
-    grid_datasource = driver.Open(get_data_path(("grids.gpkg",)))
-    grid_layer = grid_datasource.GetLayerByName("Canada-50000")
-    grid_layer.SetSpatialFilterRect(bbox.min_x, bbox.min_y, bbox.max_x, bbox.max_y)
-    bbox_cells = list()
+# next step is to write clipped hillshade outputs to tmp dir - NOT CACHE DIR - and return those paths to caller
+
+# need to also write BC TRIM clipped tiles to tmp as currently polluting cache
+
+# should also see if can do some antialiasing on the hillshade cells
+
+
+def paths_for_bbox(bbox: BBOX, ignore_cache: Optional[bool] = False) -> List[str]:
+    makedirs(_cache_dir, exist_ok=True)
+    makedirs(_generated_dir, exist_ok=True)
+    driver = ogr.GetDriverByName("FlatGeobuf")
+    grid_datasource = driver.Open(nts_50000_grid_path)
+    grid_layer = grid_datasource.GetLayerByName(nts_50000_grid_layer_name)
+    grid_layer.SetSpatialFilterRect(bbox.x_min, bbox.y_min, bbox.x_max, bbox.y_max)
+    tif_paths: List[str] = []
     while grid_cell := grid_layer.GetNextFeature():
         cell_name = grid_cell.GetFieldAsString("NTS_SNRC")
-        cell_parent = re.sub(
-            "^0", "", re.search(r"^\d{2,3}[a-z]", cell_name, re.IGNORECASE)[0]
-        )
-        for cardinal in ("e", "w"):
-            cell_part_name = f"{cell_name.lower()}_{cardinal}"
-            zip_file_name = f"{cell_part_name}.dem.zip"
-            bbox_cells.append(
-                GenerationRequest(
-                    url=f"https://pub.data.gov.bc.ca/datasets/175624/{cell_parent.lower()}/{zip_file_name}",
-                    path=get_cache_path((CACHE_DIR_NAME, zip_file_name)),
-                    expected_types=["application/zip"],
-                    dem_path=get_cache_path((CACHE_DIR_NAME, f"{cell_part_name}.dem")),
-                    prj_path=get_cache_path(
-                        (CACHE_DIR_NAME, f"{cell_part_name}_prj.tif")
-                    ),
-                    hs_path=get_cache_path(
-                        (CACHE_DIR_NAME, f"{cell_part_name}_hs.tif")
-                    ),
-                    run_path=os.path.join(run_directory, f"{cell_part_name}.tif"),
+        cell_parent = sub("^0", "", search(r"^\d{2,3}[a-z]", cell_name, IGNORECASE)[0])
+        for cardinal in (
+            "e",
+            "w",
+        ):
+            dem_name = f"{cell_name.lower()}_{cardinal}.dem"
+            hillshade_tif_path = path.join(_cache_dir, "{}.hs.tif".format(dem_name))
+            if path.exists(hillshade_tif_path) and not ignore_cache:
+                continue
+            dem_cache_path = path.join(_cache_dir, dem_name)
+            if not path.exists(dem_cache_path) or ignore_cache:
+                zip_file_name = "{}.zip".format(dem_name)
+                zip_cache_path = path.join(_cache_dir, zip_file_name)
+                zip_url = "https://pub.data.gov.bc.ca/datasets/175624/{}/{}".format(
+                    cell_parent, zip_file_name
                 )
+                _logger.info("fetching '{}' from {}".format(cell_name, zip_url))
+                response = get(zip_url)
+                assert response.ok, "failed to download {}".format(zip_url)
+                with open(zip_cache_path, "wb") as f:
+                    f.write(cast(bytes, response.content))
+                if not path.exists(dem_cache_path) or ignore_cache:
+                    try:
+                        _logger.info("extracting {}".format(cell_name))
+                        with ZipFile(zip_cache_path, "r") as zip_ref:
+                            zip_ref.extract(
+                                dem_name,
+                                _cache_dir,
+                            )
+                    except Exception:
+                        _logger.exception("failed during zip extraction")
+                        raise
+            _logger.info(
+                "hillshading {} to {}".format(dem_cache_path, hillshade_tif_path)
             )
-
-    to_generate = list(
-        filter(
-            lambda generation_request: not skip_file_creation(
-                generation_request.hs_path
-            ),
-            bbox_cells,
-        )
-    )
-    retrieve(to_generate, HTTP_RETRIEVAL_CONCURRENCY)
-
-    for generation_request in to_generate:
-        with zipfile.ZipFile(generation_request.path, "r") as zip_ref:
-            zip_ref.extractall(get_cache_path((CACHE_DIR_NAME,)))
-        Warp(
-            generation_request.prj_path,
-            generation_request.dem_path,
-            srcSRS="EPSG:4269",
-            dstSRS=OUTPUT_CRS_CODE,
-            resampleAlg="cubic",
-        )
-        DEMProcessing(
-            generation_request.hs_path,
-            generation_request.prj_path,
-            "hillshade",
-            format="GTiff",
-            band=1,
-            azimuth=225,
-            altitude=45,
-            scale=1,
-            zFactor=1,
-            computeEdges=True,
-        )
-        if remove_intermediaries():
-            os.remove(generation_request.path)
-            os.remove(generation_request.dem_path)
-            os.remove(generation_request.prj_path)
-
-    for generation_request in bbox_cells:
-        try:
-            Warp(
-                generation_request.run_path,
-                generation_request.hs_path,
-                cutlineDSName=get_datasource_from_bbox(
-                    bbox, get_run_data_path(run_id, None)
-                ),
-                cutlineLayer=BBOX_LAYER_NAME,
-                cropToCutline=False,
-                cutlineBlend=1,
-                dstNodata=-1,
+            gdal.DEMProcessing(
+                hillshade_tif_path,
+                dem_cache_path,
+                "hillshade",
+                format="GTiff",
+                band=1,
+                azimuth=225,
+                altitude=45,
+                scale=1,
+                zFactor=1,
+                computeEdges=True,
             )
-        except Exception as ex:
-            swallow_unimportant_warp_error(ex)
+            tif_paths.append(hillshade_tif_path)
 
-    merged_output_path = os.path.join(run_directory, "merged.tif")
-    Warp(
-        merged_output_path,
-        list(
-            filter(
-                lambda run_path: os.path.exists(run_path),
-                map(lambda generation_request: generation_request.run_path, bbox_cells),
-            )
-        ),
-    )
-
-    return [merged_output_path]
+    return tif_paths
