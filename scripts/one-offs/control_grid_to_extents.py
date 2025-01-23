@@ -3,6 +3,12 @@ from typing import Optional
 
 from osgeo import ogr
 
+from mdp_common import (
+    nts_50000_grid_file_name,
+    nts_50000_grid_layer_name,
+    nts_50000_id_attribute_name,
+)
+
 ogr.UseExceptions()
 
 
@@ -85,9 +91,9 @@ def extract_nts() -> None:
     _extract(
         source_path=path.abspath(path.join(grid_dir, "grids.gpkg")),
         source_layer_name="NTS-50000",
-        target_path=path.abspath(path.join(grid_dir, "grid-extents-generated.fgb")),
-        target_layer_name="nts-50000",
-        id_attribute="NTS_SNRC",
+        target_path=path.abspath(path.join(grid_dir, nts_50000_grid_file_name)),
+        target_layer_name=nts_50000_grid_layer_name,
+        id_attribute=nts_50000_id_attribute_name,
     )
 
 
