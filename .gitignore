@@ -4,6 +4,7 @@
 **/.autoenv*.zsh
 .vscode
 .cache/**
+.tmp/**
 
 generated-data/**
 **/control-data/.merged/**

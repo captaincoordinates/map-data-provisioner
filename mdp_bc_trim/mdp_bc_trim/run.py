@@ -1,5 +1,5 @@
 from logging import Logger, getLogger
-from os import environ, makedirs, path
+from os import environ, makedirs, path, remove
 from re import IGNORECASE, Match, search
 from typing import Final, List, Optional, cast
 from zipfile import ZipFile
@@ -7,34 +7,36 @@ from zipfile import ZipFile
 from osgeo import gdal, ogr
 from requests import get
 
-from mdp_bc_hillshade.hillshade import paths_for_bbox
+from mdp_bc_hillshade.hillshade import paths_for_bbox as hillshade_paths_for_bbox
+from mdp_common import tmp_dir
 from mdp_common.bbox import BBOX
+from mdp_common.fs import make_path_compatible
 
 _logger: Final[Logger] = getLogger(__file__)
 
-_cache_dir: Final[str] = environ.get(
-    "TRIM_CACHE_DIR", path.join(path.dirname(__file__), ".cache", "bc-trim")
+_cache_dir: Final[str] = path.join(
+    environ.get("CACHE_DIR", path.join(path.dirname(__file__), "..", "..", ".cache")),
+    "bc-trim",
 )
 _control_source_path: Final[str] = path.join(
     path.dirname(__file__), "control-data", ".merged", "grid-extents.fgb"
 )
 _control_grid_layer_name: Final[str] = "bc-trim-20000"
 _generated_dir: Final[str] = environ.get(
-    "TRIM_GENERATED_DIR", path.join(path.dirname(__file__), "generated-data")
+    "GENERATED_DIR", path.join(path.dirname(__file__), "..", "..", "generated-data")
 )
 
 
 def execute(
-    bbox: BBOX, include_hillshade: bool = False, ignore_cache: Optional[bool] = False
-) -> str:
-    final_tif_path_no_suffix = "bc-trim-{}{}".format(
-        bbox.to_path_part(), "-hillshade" if include_hillshade else ""
+    bbox: BBOX,
+    include_hillshade: bool = False,
+    ignore_cache: Optional[bool] = False,
+    output_crs: str = "EPSG:3005",
+) -> List[str]:
+    rgb_tif_name_no_suffix = "bc-trim-{}-{}".format(
+        bbox.as_path_part, make_path_compatible(output_crs)
     )
-    final_tif_path = path.join(
-        _generated_dir, "{}.tif".format(final_tif_path_no_suffix)
-    )
-    if path.exists(final_tif_path) and not ignore_cache:
-        return final_tif_path
+    rgb_tif_path = path.join(_generated_dir, "{}.tif".format(rgb_tif_name_no_suffix))
     makedirs(_cache_dir, exist_ok=True)
     makedirs(_generated_dir, exist_ok=True)
     driver = ogr.GetDriverByName("FlatGeobuf")
@@ -44,34 +46,37 @@ def execute(
     generated_tif_paths: List[str] = []
     while grid_cell := grid_layer.GetNextFeature():
         cell_name = grid_cell.GetFieldAsString("MAP_TILE")
-        tif_name = "{}.tif".format(cell_name)
-        tif_output_path = path.join(_cache_dir, tif_name)
+        tif_output_path = path.join(
+            tmp_dir, "{}-{}.tif".format(cell_name, make_path_compatible(output_crs))
+        )
         generated_tif_paths.append(tif_output_path)
         if path.exists(tif_output_path) and not ignore_cache:
+            _logger.info("{} already exists".format(tif_output_path))
             continue
-        zip_cache_path = path.join(_cache_dir, "{}.zip".format(cell_name))
-        if path.exists(zip_cache_path) and not ignore_cache:
-            continue
-        cell_parent = cast(Match, search(r"^\d{2,3}[a-z]", cell_name, IGNORECASE))[0]
-        zip_url = f"https://pub.data.gov.bc.ca/datasets/177864/tif/bcalb/{cell_parent}/{cell_name}.zip"
-        _logger.info("fetching '{}' from {}".format(cell_name, zip_url))
-        response = get(zip_url)
-        assert response.ok, "failed to download {}".format(zip_url)
-        with open(zip_cache_path, "wb") as f:
-            f.write(cast(bytes, response.content))
-        tif_cache_path = path.join(_cache_dir, tif_name)
-        if path.exists(tif_cache_path) and not ignore_cache:
-            continue
-        try:
-            _logger.info("extracting {}".format(cell_name))
-            with ZipFile(zip_cache_path, "r") as zip_ref:
-                zip_ref.extract(
-                    tif_name,
-                    _cache_dir,
-                )
-        except Exception:
-            _logger.exception("failed during zip extraction")
-            raise
+        tif_cache_path = path.join(_cache_dir, "{}.tif".format(cell_name))
+        if not path.exists(tif_cache_path) or ignore_cache:
+            zip_tmp_path = path.join(tmp_dir, "{}.zip".format(cell_name))
+            cell_parent = cast(Match, search(r"^\d{2,3}[a-z]", cell_name, IGNORECASE))[
+                0
+            ]
+            zip_url = f"https://pub.data.gov.bc.ca/datasets/177864/tif/bcalb/{cell_parent}/{cell_name}.zip"
+            _logger.info("fetching '{}' from {}".format(cell_name, zip_url))
+            response = get(zip_url)
+            assert response.ok, "failed to download {}".format(zip_url)
+            with open(zip_tmp_path, "wb") as f:
+                f.write(cast(bytes, response.content))
+            try:
+                _logger.info("extracting {}".format(cell_name))
+                with ZipFile(zip_tmp_path, "r") as zip_ref:
+                    zip_ref.extract(
+                        "{}.tif".format(cell_name),
+                        _cache_dir,
+                    )
+            except Exception:
+                _logger.exception("failed during zip extraction")
+                raise
+            remove(zip_tmp_path)
+        _logger.info("clipping {} to {}".format(tif_cache_path, tif_output_path))
         try:
             gdal.Warp(
                 tif_output_path,
@@ -82,35 +87,60 @@ def execute(
                 cropToCutline=False,
                 cutlineBlend=1,
                 dstNodata=-1,
-                # dstSRS=OUTPUT_CRS_CODE,
+                dstSRS=output_crs,
                 resampleAlg="lanczos",
             )
-            generated_tif_paths.append(tif_output_path)
         except Exception:
-            _logger.exception("failed during GDAL warp")
+            _logger.exception("failed during GDAL clipping warp")
             raise
 
-    if include_hillshade:
-        _ = paths_for_bbox(bbox, ignore_cache=ignore_cache)
+    trim_vrt_path = path.join(tmp_dir, "{}.vrt".format(rgb_tif_name_no_suffix))
+    _logger.info("generating VRT {}".format(trim_vrt_path))
+    gdal.BuildVRT(trim_vrt_path, generated_tif_paths)
+    _logger.info("generating {}".format(rgb_tif_path))
+    gdal.Warp(
+        rgb_tif_path,
+        trim_vrt_path,
+        cutlineWKT=bbox.as_wkt,
+        cutlineSRS=bbox.crs_code,
+        cropToCutline=True,
+        cutlineBlend=1,
+        dstNodata=-1,
+        dstSRS=output_crs,
+        resampleAlg="cubic",
+    )
+    output_paths = [rgb_tif_path]
 
-    vrt_path = path.join(_cache_dir, "{}.vrt".format(final_tif_path_no_suffix))
-    if not path.exists(vrt_path) or ignore_cache:
-        gdal.BuildVRT(vrt_path, generated_tif_paths)
+    if include_hillshade:
+        _logger.info("generating hillshade TIFs")
+        hillshade_source_paths = hillshade_paths_for_bbox(
+            bbox, ignore_cache=ignore_cache, output_crs=output_crs
+        )
+        hillshade_tif_name_no_suffix = "hillshade-{}-{}".format(
+            bbox.as_path_part, make_path_compatible(output_crs)
+        )
+        hillshade_vrt_path = path.join(
+            tmp_dir, "{}.vrt".format(hillshade_tif_name_no_suffix)
+        )
+        _logger.info("generating VRT {}".format(hillshade_vrt_path))
+        gdal.BuildVRT(hillshade_vrt_path, hillshade_source_paths)
+        hillshade_tif_path = path.join(
+            _generated_dir, "{}.tif".format(hillshade_tif_name_no_suffix)
+        )
         gdal.Warp(
-            final_tif_path,
-            vrt_path,
-            cutlineWKT=bbox.as_wkt(),
+            hillshade_tif_path,
+            hillshade_vrt_path,
+            cutlineWKT=bbox.as_wkt,
             cutlineSRS=bbox.crs_code,
             cropToCutline=True,
             cutlineBlend=1,
             dstNodata=-1,
-            # dstSRS=OUTPUT_CRS_CODE,
-            resampleAlg="lanczos",
+            dstSRS=output_crs,
+            resampleAlg="cubic",
         )
+        output_paths.append(hillshade_tif_path)
 
-    # optionally (if requested by script) convert to geoPDF
-
-    return final_tif_path
+    return output_paths
 
 
 if __name__ == "__main__":

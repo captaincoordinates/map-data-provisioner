@@ -7,3 +7,4 @@ nts_50000_grid_path: Final[str] = path.join(
 )
 nts_50000_grid_layer_name: Final[str] = "nts-50000"
 nts_50000_id_attribute_name: Final[str] = "NTS_SNRC"
+tmp_dir: Final[str] = path.join(path.sep, "tmp")
