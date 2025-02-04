@@ -1,7 +1,7 @@
 from setuptools import find_namespace_packages, setup
 
 setup(
-    name="bc-trim-stitch",
+    name="mdp-bc-trim",
     version="0.1.0",
     python_requires=">=3.12",
     packages=find_namespace_packages(),
@@ -15,5 +15,9 @@ setup(
             "pre-commit~=4.0.1",
         ],
         "test": [],
+        "local_dependencies": [
+            "mdp-common==0.10.0",
+            "mdp-bc-hillshade==0.10.0",
+        ],
     },
 )

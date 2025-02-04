@@ -5,5 +5,16 @@ RUN apt-get update --fix-missing \
   python3-pip=24.0+dfsg-1ubuntu1.1 \
   && rm -rf /var/lib/apt/lists/*
 
-COPY bc_trim_stitch/requirements-generated.txt /requirements.txt
-RUN pip install --no-cache-dir --break-system-packages -r /requirements.txt
+COPY mdp_common/requirements-generated.txt /requirements-common.txt
+RUN pip install --no-cache-dir --break-system-packages -r /requirements-common.txt
+COPY mdp_bc_hillshade/requirements-generated.txt /requirements-bc_hillshade.txt
+RUN pip install --no-cache-dir --break-system-packages -r /requirements-bc_hillshade.txt
+COPY mdp_bc_trim/requirements-generated.txt /requirements-bc_trim.txt
+RUN pip install --no-cache-dir --break-system-packages -r /requirements-bc_trim.txt
+
+COPY mdp_common /mdp_common
+RUN pip install --no-cache-dir --break-system-packages -e /mdp_common
+COPY mdp_bc_hillshade /mdp_bc_hillshade
+RUN pip install --no-cache-dir --break-system-packages -e mdp_bc_hillshade
+COPY mdp_bc_trim /mdp_bc_trim
+RUN pip install --no-cache-dir --break-system-packages -e mdp_bc_trim

@@ -3,8 +3,12 @@
 **/*.egg-info
 **/.autoenv*.zsh
 .vscode
-.cache/bc-trim/**
+.cache/**
+.tmp/**
+
 generated-data/**
-bc_trim_stitch/bc_trim_stitch/control-data/.merged/**
+**/control-data/.merged/**
+**/control-data/grid-extents-generated.fgb
+**/control-data/grids.gpkg
 
 !**/.gitkeep
