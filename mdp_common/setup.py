@@ -6,7 +6,7 @@ setup(
     python_requires=">=3.12",
     packages=find_namespace_packages(),
     install_requires=[
-        "gdal~=3.10.0",
+        # gdal is required but we rely on a container image or local env to provide it due to installation challenges
         "pyproj~=3.7.0",
         "requests~=2.32.3",
     ],

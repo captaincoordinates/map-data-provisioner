@@ -4,8 +4,6 @@ set -e
 
 pushd $(dirname $0)/..
 
-scripts/merge-grids.sh
-
 image_name="captaincoordinates/mdp"
 docker build \
     -t $image_name \
@@ -18,6 +16,6 @@ docker run \
     -v $PWD/.tmp:/tmp:rw \
     -e CACHE_DIR=/cache \
     -e GENERATED_DIR=/generated-data \
-    -w /mdp_bc_trim \
+    -w /mdp_canvec \
     $image_name \
-    python -m mdp_bc_trim.run "$@"
+    python -m mdp_canvec.run "$@"

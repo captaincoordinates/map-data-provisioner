@@ -51,7 +51,7 @@ class _ImageRequestProperties:
 
 
 def provision(
-    wms_label: str,
+    label: str,
     bbox: BBOX,
     base_url: str,
     wms_properties: WmsProperties,
@@ -101,7 +101,7 @@ def provision(
         _convert_response_to_tif(entry, wms_crs_code)
 
     output_file_name_template = "{}-{}-{}-{}".format(
-        wms_label,
+        label,
         scale,
         bbox.as_path_part,
         make_path_compatible(wms_crs_code),

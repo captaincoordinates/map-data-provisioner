@@ -29,6 +29,10 @@ pid2=$!
 pip-compile -q --no-annotate --no-strip-extras --output-file mdp_bc_trim/requirements-generated.txt mdp_bc_trim/setup.py &
 pid3=$!
 
+pip-compile -q --no-annotate --no-strip-extras --output-file mdp_canvec/requirements-generated.txt mdp_canvec/setup.py &
+pid4=$!
+
 wait $pid1
 wait $pid2
 wait $pid3
+wait $pid4
