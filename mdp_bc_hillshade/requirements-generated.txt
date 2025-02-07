@@ -4,4 +4,3 @@
 #
 #    pip-compile --no-annotate --output-file=mdp_bc_hillshade/requirements-generated.txt mdp_bc_hillshade/setup.py
 #
-gdal==3.10

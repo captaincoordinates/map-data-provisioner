@@ -5,9 +5,7 @@ setup(
     version="0.1.0",
     python_requires=">=3.12",
     packages=find_namespace_packages(),
-    install_requires=[
-        "gdal~=3.10.0",
-    ],
+    install_requires=[],
     extras_require={
         "local_dependencies": [
             "mdp-common==0.10.0",
