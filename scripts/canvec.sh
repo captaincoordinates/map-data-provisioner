@@ -4,6 +4,8 @@ set -e
 
 pushd $(dirname $0)/..
 
+scripts/merge-grids.sh
+
 image_name="captaincoordinates/mdp"
 docker build \
     -t $image_name \
